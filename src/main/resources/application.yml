@@ -41,3 +41,12 @@ logging:
   level:
     com.demo.scheduler: INFO
     org.springframework.data.redis: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
