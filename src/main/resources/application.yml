@@ -1,0 +1,43 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: distributed-scheduler
+
+  # Redis Configuration
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+
+  # PostgreSQL Configuration
+  datasource:
+    url: jdbc:postgresql://localhost:5432/scheduler
+    username: scheduler
+    password: scheduler123
+    driver-class-name: org.postgresql.Driver
+
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+# Application-specific settings
+scheduler:
+  worker:
+    pool-size: 10
+    poll-interval-ms: 100
+  queue:
+    name: task-queue
+
+logging:
+  level:
+    com.demo.scheduler: INFO
+    org.springframework.data.redis: WARN

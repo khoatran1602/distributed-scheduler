@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Task Scheduler - Live Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0f0f23;
+            --bg-secondary: #1a1a2e;
+            --bg-card: #16213e;
+            --accent-blue: #00d4ff;
+            --accent-green: #00ff88;
+            --accent-orange: #ff9f43;
+            --accent-red: #ff6b6b;
+            --accent-purple: #a855f7;
+            --text-primary: #ffffff;
+            --text-secondary: #94a3b8;
+            --border-color: rgba(255,255,255,0.1);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: 
+                radial-gradient(ellipse at 20% 80%, rgba(0, 212, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(168, 85, 247, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(0, 255, 136, 0.05) 0%, transparent 50%);
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        /* Header */
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .logo-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            margin-top: 0.5rem;
+        }
+        
+        /* Status Badge */
+        .status-bar {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border-radius: 50px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: blink 1s ease-in-out infinite;
+        }
+        
+        .status-dot.online { background: var(--accent-green); }
+        .status-dot.offline { background: var(--accent-red); animation: none; }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--card-accent);
+        }
+        
+        .stat-card.blue { --card-accent: var(--accent-blue); }
+        .stat-card.green { --card-accent: var(--accent-green); }
+        .stat-card.orange { --card-accent: var(--accent-orange); }
+        .stat-card.red { --card-accent: var(--accent-red); }
+        .stat-card.purple { --card-accent: var(--accent-purple); }
+        
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+            color: var(--card-accent);
+        }
+        
+        .stat-change {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        
+        /* Progress Section */
+        .progress-section {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid var(--border-color);
+            margin-bottom: 2rem;
+        }
+        
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .progress-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        
+        .progress-bar-container {
+            height: 24px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+        }
+        
+        .progress-segment {
+            height: 100%;
+            transition: width 0.5s ease;
+        }
+        
+        .progress-segment.completed { background: var(--accent-green); }
+        .progress-segment.processing { background: var(--accent-orange); animation: processing 1s ease-in-out infinite; }
+        .progress-segment.pending { background: var(--accent-blue); }
+        .progress-segment.failed { background: var(--accent-red); }
+        
+        @keyframes processing {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .progress-legend {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 4px;
+        }
+        
+        /* RPS Gauge */
+        .gauge-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        @media (max-width: 768px) {
+            .gauge-section { grid-template-columns: 1fr; }
+        }
+        
+        .gauge-card {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+        
+        .gauge-title {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+        
+        .gauge-value {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .gauge-unit {
+            font-size: 1rem;
+            color: var(--text-secondary);
+        }
+        
+        /* Task Flow Visualization */
+        .flow-section {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid var(--border-color);
+            margin-bottom: 2rem;
+        }
+        
+        .flow-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        
+        .flow-diagram {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .flow-node {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            text-align: center;
+            border: 2px solid var(--border-color);
+            min-width: 120px;
+        }
+        
+        .flow-node.active {
+            border-color: var(--accent-green);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+        }
+        
+        .flow-node-icon {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .flow-node-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .flow-node-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-top: 0.25rem;
+        }
+        
+        .flow-arrow {
+            font-size: 1.5rem;
+            color: var(--accent-blue);
+            animation: flowPulse 1s ease-in-out infinite;
+        }
+        
+        @keyframes flowPulse {
+            0%, 100% { opacity: 0.5; transform: translateX(0); }
+            50% { opacity: 1; transform: translateX(5px); }
+        }
+        
+        /* Controls */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 212, 255, 0.3);
+        }
+        
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--bg-card);
+        }
+        
+        .btn-danger {
+            background: var(--accent-red);
+            color: white;
+        }
+        
+        /* Live Activity Feed */
+        .activity-section {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid var(--border-color);
+        }
+        
+        .activity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .activity-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        
+        .activity-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .activity-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            background: var(--bg-secondary);
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        .activity-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        
+        .activity-dot.created { background: var(--accent-blue); }
+        .activity-dot.processing { background: var(--accent-orange); }
+        .activity-dot.completed { background: var(--accent-green); }
+        .activity-dot.failed { background: var(--accent-red); }
+        
+        .activity-text {
+            flex: 1;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        
+        .activity-time {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+        
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 1000;
+        }
+        
+        .toast {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-top: 0.5rem;
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: toastIn 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(100px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+    
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">⚡</div>
+                <h1>Distributed Task Scheduler</h1>
+            </div>
+            <p class="subtitle">Real-time monitoring dashboard for high-concurrency task processing</p>
+        </header>
+        
+        <div class="status-bar">
+            <div class="status-badge">
+                <div class="status-dot" id="apiStatus"></div>
+                <span id="apiStatusText">Connecting...</span>
+            </div>
+            <div class="status-badge">
+                <span>🔄 Auto-refresh: </span>
+                <span id="refreshRate">500ms</span>
+            </div>
+        </div>
+        
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card blue">
+                <div class="stat-header">
+                    <span class="stat-label">Queue Depth</span>
+                    <div class="stat-icon">📥</div>
+                </div>
+                <div class="stat-value" id="queueDepth">0</div>
+                <div class="stat-change">Tasks waiting in Redis</div>
+            </div>
+            
+            <div class="stat-card orange">
+                <div class="stat-header">
+                    <span class="stat-label">Processing</span>
+                    <div class="stat-icon">⚙️</div>
+                </div>
+                <div class="stat-value" id="processingTasks">0</div>
+                <div class="stat-change">Currently being processed</div>
+            </div>
+            
+            <div class="stat-card green">
+                <div class="stat-header">
+                    <span class="stat-label">Completed</span>
+                    <div class="stat-icon">✅</div>
+                </div>
+                <div class="stat-value" id="completedTasks">0</div>
+                <div class="stat-change" id="completedRate">+0/sec</div>
+            </div>
+            
+            <div class="stat-card red">
+                <div class="stat-header">
+                    <span class="stat-label">Failed</span>
+                    <div class="stat-icon">❌</div>
+                </div>
+                <div class="stat-value" id="failedTasks">0</div>
+                <div class="stat-change" id="failedRate">0% failure rate</div>
+            </div>
+            
+            <div class="stat-card purple">
+                <div class="stat-header">
+                    <span class="stat-label">Total Tasks</span>
+                    <div class="stat-icon">📊</div>
+                </div>
+                <div class="stat-value" id="totalTasks">0</div>
+                <div class="stat-change">All time submitted</div>
+            </div>
+        </div>
+        
+        <!-- Progress Bar -->
+        <div class="progress-section">
+            <div class="progress-header">
+                <span class="progress-title">Task Processing Progress</span>
+                <span id="progressPercent">0%</span>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-segment completed" id="progressCompleted" style="width: 0%"></div>
+                <div class="progress-segment processing" id="progressProcessing" style="width: 0%"></div>
+                <div class="progress-segment pending" id="progressPending" style="width: 0%"></div>
+                <div class="progress-segment failed" id="progressFailed" style="width: 0%"></div>
+            </div>
+            <div class="progress-legend">
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: var(--accent-green)"></div>
+                    <span>Completed</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: var(--accent-orange)"></div>
+                    <span>Processing</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: var(--accent-blue)"></div>
+                    <span>Pending</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: var(--accent-red)"></div>
+                    <span>Failed</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Gauges -->
+        <div class="gauge-section">
+            <div class="gauge-card">
+                <div class="gauge-title">Processing Rate</div>
+                <div class="gauge-value" id="rpsValue">0</div>
+                <div class="gauge-unit">tasks/second</div>
+            </div>
+            <div class="gauge-card">
+                <div class="gauge-title">Worker Throughput</div>
+                <div class="gauge-value" id="workerProcessed">0</div>
+                <div class="gauge-unit">processed by workers</div>
+            </div>
+        </div>
+        
+        <!-- Flow Diagram -->
+        <div class="flow-section">
+            <div class="flow-title">Architecture: Producer → Broker → Consumer</div>
+            <div class="flow-diagram">
+                <div class="flow-node active">
+                    <div class="flow-node-icon">📤</div>
+                    <div class="flow-node-label">Producer</div>
+                    <div class="flow-node-value" id="flowProducer">REST API</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node active">
+                    <div class="flow-node-icon">🔴</div>
+                    <div class="flow-node-label">Redis Queue</div>
+                    <div class="flow-node-value" id="flowRedis">0</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node active">
+                    <div class="flow-node-icon">👷</div>
+                    <div class="flow-node-label">Workers (10)</div>
+                    <div class="flow-node-value" id="flowWorkers">Active</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-node active">
+                    <div class="flow-node-icon">🐘</div>
+                    <div class="flow-node-label">PostgreSQL</div>
+                    <div class="flow-node-value" id="flowPostgres">0</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Controls -->
+        <div class="controls">
+            <button class="btn btn-primary" onclick="submitTask()">
+                <span>➕</span> Submit Task
+            </button>
+            <button class="btn btn-secondary" onclick="submitBatch(100)">
+                <span>📦</span> Submit 100 Tasks
+            </button>
+            <button class="btn btn-secondary" onclick="submitBatch(1000)">
+                <span>🚀</span> Submit 1,000 Tasks
+            </button>
+        </div>
+        
+        <!-- Activity Feed -->
+        <div class="activity-section">
+            <div class="activity-header">
+                <span class="activity-title">📋 Live Activity Feed</span>
+                <button class="btn btn-secondary" onclick="clearActivity()">Clear</button>
+            </div>
+            <div class="activity-list" id="activityList">
+                <div class="activity-item">
+                    <div class="activity-dot created"></div>
+                    <span class="activity-text">Dashboard initialized, waiting for API connection...</span>
+                    <span class="activity-time">just now</span>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Distributed Task Scheduler Dashboard | Built with Spring Boot 3, Redis & PostgreSQL | Java 21</p>
+        </footer>
+    </div>
+    
+    <div class="toast-container" id="toastContainer"></div>
+    
+    <script>
+        const API_BASE = 'http://localhost:8080/api/tasks';
+        let lastCompleted = 0;
+        let lastTimestamp = Date.now();
+        let isConnected = false;
+        
+        // Format numbers with commas
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+        
+        // Update stats from API
+        async function updateStats() {
+            try {
+                const response = await fetch(`${API_BASE}/stats`);
+                if (!response.ok) throw new Error('API error');
+                
+                const stats = await response.json();
+                
+                // Update connection status
+                if (!isConnected) {
+                    isConnected = true;
+                    document.getElementById('apiStatus').className = 'status-dot online';
+                    document.getElementById('apiStatusText').textContent = 'Connected';
+                    addActivity('created', 'Connected to API server');
+                }
+                
+                // Update stat cards
+                document.getElementById('queueDepth').textContent = formatNumber(stats.queueDepth);
+                document.getElementById('processingTasks').textContent = formatNumber(stats.processingTasks);
+                document.getElementById('completedTasks').textContent = formatNumber(stats.completedTasks);
+                document.getElementById('failedTasks').textContent = formatNumber(stats.failedTasks);
+                document.getElementById('totalTasks').textContent = formatNumber(stats.totalTasks);
+                document.getElementById('workerProcessed').textContent = formatNumber(stats.processedByWorker);
+                
+                // Calculate RPS
+                const now = Date.now();
+                const elapsed = (now - lastTimestamp) / 1000;
+                const completedDiff = stats.completedTasks - lastCompleted;
+                const rps = elapsed > 0 ? Math.round(completedDiff / elapsed) : 0;
+                
+                document.getElementById('rpsValue').textContent = formatNumber(rps);
+                document.getElementById('completedRate').textContent = `+${formatNumber(rps)}/sec`;
+                
+                lastCompleted = stats.completedTasks;
+                lastTimestamp = now;
+                
+                // Calculate failure rate
+                const failureRate = stats.totalTasks > 0 
+                    ? ((stats.failedTasks / stats.totalTasks) * 100).toFixed(2) 
+                    : 0;
+                document.getElementById('failedRate').textContent = `${failureRate}% failure rate`;
+                
+                // Update progress bar
+                const total = stats.totalTasks || 1;
+                const completedPct = (stats.completedTasks / total) * 100;
+                const processingPct = (stats.processingTasks / total) * 100;
+                const pendingPct = (stats.pendingTasks / total) * 100;
+                const failedPct = (stats.failedTasks / total) * 100;
+                
+                document.getElementById('progressCompleted').style.width = `${completedPct}%`;
+                document.getElementById('progressProcessing').style.width = `${processingPct}%`;
+                document.getElementById('progressPending').style.width = `${pendingPct}%`;
+                document.getElementById('progressFailed').style.width = `${failedPct}%`;
+                document.getElementById('progressPercent').textContent = `${completedPct.toFixed(1)}% complete`;
+                
+                // Update flow diagram
+                document.getElementById('flowRedis').textContent = formatNumber(stats.queueDepth);
+                document.getElementById('flowPostgres').textContent = formatNumber(stats.totalTasks);
+                
+            } catch (error) {
+                if (isConnected) {
+                    isConnected = false;
+                    document.getElementById('apiStatus').className = 'status-dot offline';
+                    document.getElementById('apiStatusText').textContent = 'Disconnected';
+                    addActivity('failed', 'Lost connection to API server');
+                }
+            }
+        }
+        
+        // Submit a single task
+        async function submitTask() {
+            try {
+                const response = await fetch(API_BASE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ payload: `Dashboard task at ${new Date().toISOString()}` })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addActivity('created', `Task #${data.id} submitted`);
+                    showToast('✅ Task submitted successfully', 'success');
+                }
+            } catch (error) {
+                showToast('❌ Failed to submit task', 'error');
+            }
+        }
+        
+        // Submit batch of tasks
+        async function submitBatch(count) {
+            showToast(`🚀 Submitting ${count} tasks...`, 'info');
+            addActivity('processing', `Submitting batch of ${count} tasks...`);
+            
+            const promises = [];
+            for (let i = 0; i < count; i++) {
+                promises.push(fetch(API_BASE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ payload: `Batch task ${i+1}/${count} at ${Date.now()}` })
+                }));
+            }
+            
+            try {
+                await Promise.all(promises);
+                addActivity('completed', `Batch of ${count} tasks submitted successfully`);
+                showToast(`✅ ${count} tasks submitted`, 'success');
+            } catch (error) {
+                addActivity('failed', `Some tasks in batch failed`);
+                showToast('⚠️ Some tasks failed', 'warning');
+            }
+        }
+        
+        // Add activity to feed
+        function addActivity(type, message) {
+            const list = document.getElementById('activityList');
+            const item = document.createElement('div');
+            item.className = 'activity-item';
+            item.innerHTML = `
+                <div class="activity-dot ${type}"></div>
+                <span class="activity-text">${message}</span>
+                <span class="activity-time">${new Date().toLocaleTimeString()}</span>
+            `;
+            list.insertBefore(item, list.firstChild);
+            
+            // Keep only last 50 items
+            while (list.children.length > 50) {
+                list.removeChild(list.lastChild);
+            }
+        }
+        
+        // Clear activity feed
+        function clearActivity() {
+            document.getElementById('activityList').innerHTML = '';
+            addActivity('created', 'Activity feed cleared');
+        }
+        
+        // Show toast notification
+        function showToast(message, type) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `<span>${message}</span>`;
+            container.appendChild(toast);
+            
+            setTimeout(() => toast.remove(), 3000);
+        }
+        
+        // Start polling
+        setInterval(updateStats, 500);
+        updateStats();
+    </script>
+</body>
+</html>
