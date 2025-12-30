@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Scheduler Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text-light: #f8fafc;
+            --text-gray: #cbd5e1;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --kafka-orange: #ff6b35;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            margin: 0;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 2rem;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        h1, h2, h3 { margin-top: 0; }
+        h2 { font-size: 1.25rem; margin-bottom: 1rem; color: var(--text-gray); }
+
+        /* Left Panel */
+        .sidebar { display: flex; flex-direction: column; gap: 1.5rem; }
+
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; color: var(--text-gray); }
+        input, select, textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            background-color: #0f172a;
+            color: white;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: var(--primary-dark); }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        .stat-item {
+            background: rgba(255,255,255,0.05);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-val { font-size: 1.5rem; font-weight: 700; display: block; }
+        .stat-label { font-size: 0.75rem; color: var(--text-gray); }
+
+        /* Right Panel - Flow & Logs */
+        .workspace { display: flex; flex-direction: column; gap: 1.5rem; }
+        
+        .flow-diagram {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 2rem;
+        }
+
+        .node {
+            background: var(--bg-card);
+            border: 2px solid var(--primary);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            width: 120px;
+            z-index: 2;
+            position: relative;
+        }
+        
+        .node.active { box-shadow: 0 0 15px var(--primary); border-color: white; }
+
+        /* Connector Lines */
+        .connector {
+            flex-grow: 1;
+            height: 2px;
+            background: #334155;
+            position: relative;
+            margin: 0 10px;
+        }
+        
+        .packet {
+            width: 12px;
+            height: 12px;
+            background: var(--success);
+            border-radius: 50%;
+            position: absolute;
+            top: -5px;
+            left: 0;
+            opacity: 0;
+        }
+        
+        @keyframes flow {
+            0% { left: 0; opacity: 1; }
+            90% { left: 100%; opacity: 1; }
+            100% { left: 100%; opacity: 0; }
+        }
+
+        .run-flow .packet {
+            animation: flow 1s linear forwards;
+        }
+
+        /* Broker Toggle Status */
+        .broker-badg {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .broker-redis { background: #b91c1c; color: white; }
+        .broker-kafka { background: #000; color: white; border: 1px solid #333; }
+
+        /* Task List */
+        .task-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+        th, td {
+            text-align: left;
+            padding: 0.75rem;
+            border-bottom: 1px solid #334155;
+        }
+        th { color: var(--text-gray); font-weight: 500; }
+        
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+        }
+        .status-PENDING { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .status-PROCESSING { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        .status-COMPLETED { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .status-FAILED { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+        /* Kafka Inspector Styles */
+        .kafka-inspector {
+            border: 2px solid var(--kafka-orange);
+            border-radius: 12px;
+        }
+        .kafka-inspector h2 {
+            color: var(--kafka-orange);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .kafka-inspector h2::before {
+            content: '▶';
+            font-size: 0.75rem;
+            transition: transform 0.2s;
+        }
+        .kafka-inspector.expanded h2::before {
+            transform: rotate(90deg);
+        }
+        .kafka-content {
+            display: none;
+            margin-top: 1rem;
+        }
+        .kafka-inspector.expanded .kafka-content {
+            display: block;
+        }
+        
+        .kafka-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .kafka-card {
+            background: rgba(255, 107, 53, 0.1);
+            border: 1px solid rgba(255, 107, 53, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        .kafka-card h3 {
+            font-size: 0.875rem;
+            color: var(--kafka-orange);
+            margin-bottom: 0.5rem;
+        }
+        .kafka-card .value {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+        .kafka-card .sub {
+            font-size: 0.75rem;
+            color: var(--text-gray);
+        }
+
+        /* Message Flow Table */
+        .message-flow {
+            max-height: 250px;
+            overflow-y: auto;
+            font-size: 0.8rem;
+        }
+        .message-flow table {
+            font-size: 0.75rem;
+        }
+        .message-flow td, .message-flow th {
+            padding: 0.5rem;
+        }
+        .direction-PRODUCED {
+            color: var(--success);
+        }
+        .direction-CONSUMED {
+            color: var(--primary);
+        }
+        .payload-preview {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: monospace;
+            font-size: 0.7rem;
+            color: var(--text-gray);
+        }
+        .lag-indicator {
+            display: inline-block;
+            padding: 0.125rem 0.375rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+        .lag-ok { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .lag-warning { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        .lag-danger { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="card">
+            <h1>Scheduler <span id="broker-badge" class="broker-badg" style="cursor: pointer;" onclick="toggleBroker()" title="Click to switch broker">...</span></h1>
+            <p style="color:var(--text-gray); font-size:0.9rem">Enterprise Distributed Task System</p>
+        </div>
+
+        <div class="card">
+            <h2>Submit Task</h2>
+            <div class="form-group">
+                <label>Payload / Command</label>
+                <input type="text" id="payloadInput" placeholder="e.g. Process Order #1234">
+            </div>
+            <div class="form-group">
+                <label>Quantity</label>
+                <input type="number" id="qtyInput" value="1" min="1" max="100">
+            </div>
+            <button onclick="submitTask()">🚀 Launch Task</button>
+        </div>
+
+        <div class="card">
+            <h2>Live Stats</h2>
+            <div class="stat-grid">
+                <div class="stat-item">
+                    <span class="stat-val" style="color:var(--warning)" id="stat-pending">0</span>
+                    <span class="stat-label">Pending</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-val" style="color:var(--primary)" id="stat-processing">0</span>
+                    <span class="stat-label">Processing</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-val" style="color:var(--success)" id="stat-completed">0</span>
+                    <span class="stat-label">Completed</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-val" style="color:var(--danger)" id="stat-failed">0</span>
+                    <span class="stat-label">Failed</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WORKSPACE -->
+    <div class="workspace">
+        <!-- Visual Flow -->
+        <div class="card flow-diagram">
+            <div class="node" id="node-producer">
+                <div>📤 Producer</div>
+                <small>API / Controller</small>
+            </div>
+
+            <div class="connector" id="conn-1">
+                <div class="packet"></div>
+            </div>
+
+            <div class="node" id="node-broker">
+                <div id="diagram-broker-name">🔀 Broker</div>
+                <small>Queue / Topic</small>
+            </div>
+
+            <div class="connector" id="conn-2">
+                <div class="packet"></div>
+            </div>
+
+            <div class="node" id="node-consumer">
+                <div>⚙️ Consumer</div>
+                <small>Worker Pool</small>
+            </div>
+
+            <div class="connector" id="conn-3">
+                <div class="packet"></div>
+            </div>
+
+            <div class="node" id="node-db">
+                <div>💾 Database</div>
+                <small>PostgreSQL</small>
+            </div>
+        </div>
+
+        <!-- Kafka Inspector Panel -->
+        <div class="card kafka-inspector" id="kafka-inspector">
+            <h2 onclick="toggleInspector('kafka')">🔍 Kafka Inspector</h2>
+            <div class="kafka-content">
+                <div class="kafka-grid">
+                    <div class="kafka-card">
+                        <h3>🖥️ Cluster</h3>
+                        <div class="value" id="kafka-cluster-id">-</div>
+                        <div class="sub" id="kafka-broker-info">Loading...</div>
+                    </div>
+                    <div class="kafka-card">
+                        <h3>📦 Topic</h3>
+                        <div class="value" id="kafka-topic-name">-</div>
+                        <div class="sub" id="kafka-partition-info">Partitions: -</div>
+                    </div>
+                    <div class="kafka-card">
+                        <h3>👥 Consumer Group</h3>
+                        <div class="value" id="kafka-group-state">-</div>
+                        <div class="sub">Lag: <span id="kafka-total-lag" class="lag-indicator lag-ok">0</span></div>
+                    </div>
+                </div>
+                
+                <h3 style="color: var(--kafka-orange); margin-bottom: 0.5rem;">📡 Message Flow (Real-time)</h3>
+                <div class="message-flow">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Direction</th>
+                                <th>Target</th>
+                                <th>ID/Offset</th>
+                                <th>Payload</th>
+                            </tr>
+                        </thead>
+                        <tbody id="kafka-message-tbody">
+                            <tr><td colspan="5" style="text-align:center; color:var(--text-gray)">No messages captured yet...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Redis Inspector Panel -->
+        <div class="card redis-inspector" id="redis-inspector" style="border: 2px solid #ef4444; border-radius: 12px; display:none;">
+            <h2 onclick="toggleInspector('redis')" style="color: #ef4444; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                <span id="redis-arrow">▶</span> 🔴 Redis Inspector
+            </h2>
+            <div class="redis-content" style="display:none; margin-top:1rem;">
+                <div class="kafka-grid">
+                    <div class="kafka-card" style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3);">
+                        <h3 style="color:#ef4444">🖥️ Server</h3>
+                        <div class="value" id="redis-version">-</div>
+                        <div class="sub" id="redis-uptime">Uptime: -</div>
+                    </div>
+                    <div class="kafka-card" style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3);">
+                        <h3 style="color:#ef4444">📊 Memory</h3>
+                        <div class="value" id="redis-memory">-</div>
+                        <div class="sub" id="redis-clients">Clients: -</div>
+                    </div>
+                    <div class="kafka-card" style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3);">
+                        <h3 style="color:#ef4444">📥 Queue</h3>
+                        <div class="value" id="redis-queue-size">-</div>
+                        <div class="sub" id="redis-queue-name">Queue: -</div>
+                    </div>
+                </div>
+                
+                <h3 style="color: #ef4444; margin-bottom: 0.5rem;">📡 Message Flow (Real-time)</h3>
+                <div class="message-flow">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Direction</th>
+                                <th>Target</th>
+                                <th>ID</th>
+                                <th>Payload</th>
+                            </tr>
+                        </thead>
+                        <tbody id="redis-message-tbody">
+                            <tr><td colspan="5" style="text-align:center; color:var(--text-gray)">No messages captured yet...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task Table -->
+        <div class="card task-list">
+            <h2>Recent Tasks</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Payload</th>
+                        <th>Created At</th>
+                        <th>Completed At</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="taskTableBody">
+                    <tr><td colspan="5" style="text-align:center; color:var(--text-gray)">Waiting for data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+        let currentBrokerType = 'REDIS';
+        
+        // 1. Init Config
+        async function fetchConfig() {
+            try {
+                const res = await fetch(`${API_BASE}/tasks/config`);
+                const data = await res.json();
+                const broker = data.brokerType.toUpperCase();
+                currentBrokerType = broker;
+                
+                const badge = document.getElementById('broker-badge');
+                badge.innerText = broker;
+                badge.className = `broker-badg broker-${broker.toLowerCase()}`;
+                
+                document.getElementById('diagram-broker-name').innerText = 
+                    broker === 'REDIS' ? '🔴 Redis' : '🐦 Kafka';
+
+                // Toggle Inspectors based on broker type
+                if (broker === 'KAFKA') {
+                    document.getElementById('kafka-inspector').style.display = 'block';
+                    document.getElementById('redis-inspector').style.display = 'none';
+                    document.getElementById('kafka-inspector').classList.add('expanded');
+                } else {
+                    document.getElementById('kafka-inspector').style.display = 'none';
+                    document.getElementById('redis-inspector').style.display = 'block';
+                    // Auto expand redis
+                    document.getElementById('redis-inspector').classList.add('expanded');
+                    document.querySelector('.redis-content').style.display = 'block';
+                    document.getElementById('redis-arrow').style.transform = 'rotate(90deg)';
+                }
+            } catch (e) {
+                console.error("Failed to load config", e);
+            }
+        }
+
+        // 2. Submit Task
+        async function submitTask() {
+            const payload = document.getElementById('payloadInput').value;
+            const qty = document.getElementById('qtyInput').value;
+            
+            if (!payload) return alert("Please enter a payload");
+
+            const btn = document.querySelector('button');
+            const originalText = btn.innerText;
+            btn.innerText = "Sending...";
+            btn.disabled = true;
+
+            try {
+                for (let i = 0; i < qty; i++) {
+                    await fetch(`${API_BASE}/tasks`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ payload: payload + (qty > 1 ? ` #${i+1}` : '') })
+                    });
+                }
+                
+                // Trigger animation
+                animateFlow();
+                
+                // Clear input
+                document.getElementById('payloadInput').value = '';
+                updateStats(); 
+                updateTable();
+            } catch (e) {
+                console.error(e);
+                alert("Failed to submit task");
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // 3. Update Stats
+        async function updateStats() {
+            try {
+                const res = await fetch(`${API_BASE}/tasks/stats`);
+                const stats = await res.json();
+                
+                document.getElementById('stat-pending').innerText = stats.pendingTasks;
+                document.getElementById('stat-processing').innerText = stats.processingTasks;
+                document.getElementById('stat-completed').innerText = stats.completedTasks;
+                document.getElementById('stat-failed').innerText = stats.failedTasks;
+                
+                // Update queue badge if visible
+                if (stats.queueDepth > 0) {
+                    // unexpected nice to have
+                }
+            } catch (e) { console.error("Stats failed", e); }
+        }
+
+        // 4. Update Table
+        async function updateTable() {
+            try {
+                const res = await fetch(`${API_BASE}/tasks/recent`);
+                const tasks = await res.json();
+                
+                const tbody = document.getElementById('taskTableBody');
+                if (tasks.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-gray)">No tasks found</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = tasks.map(t => `
+                    <tr>
+                        <td>#${t.id}</td>
+                        <td>${t.payload}</td>
+                        <td>${formatDate(t.createdAt)}</td>
+                        <td>${formatDate(t.completedAt)}</td>
+                        <td><span class="status-badge status-${t.status}">${t.status}</span></td>
+                    </tr>
+                `).join('');
+            } catch (e) { console.error("Table failed", e); }
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            return new Date(dateStr).toLocaleTimeString();
+        }
+
+        // 5. Inspectors
+        function toggleInspector(type) {
+            if (type === 'kafka') {
+                document.getElementById('kafka-inspector').classList.toggle('expanded');
+            } else if (type === 'redis') {
+                const content = document.querySelector('.redis-content');
+                const arrow = document.getElementById('redis-arrow');
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                    arrow.style.transform = 'rotate(90deg)';
+                } else {
+                    content.style.display = 'none';
+                    arrow.style.transform = 'rotate(0deg)';
+                }
+            }
+        }
+
+        async function updateKafkaInspector() {
+            if (document.getElementById('kafka-inspector').style.display === 'none') return;
+            
+            try {
+                const res = await fetch(`${API_BASE}/kafka/overview`);
+                const data = await res.json();
+
+                // Cluster info
+                if (data.cluster && data.cluster.status === 'CONNECTED') {
+                    document.getElementById('kafka-cluster-id').innerText = 
+                        data.cluster.clusterId ? data.cluster.clusterId.substring(0, 10) + '...' : 'Connected';
+                    const brokers = data.cluster.brokers || [];
+                    document.getElementById('kafka-broker-info').innerText = 
+                        `${brokers.length} broker(s) | Controller: ${data.cluster.controllerBrokerId}`;
+                } else {
+                    document.getElementById('kafka-cluster-id').innerText = 'Disconnected';
+                    document.getElementById('kafka-broker-info').innerText = data.cluster?.error || 'Error';
+                }
+
+                // Topic info
+                if (data.topic && !data.topic.error) {
+                    document.getElementById('kafka-topic-name').innerText = data.topic.topic;
+                    const partitions = data.topic.partitions || [];
+                    const totalMessages = partitions.reduce((sum, p) => sum + (p.messageCount || 0), 0);
+                    document.getElementById('kafka-partition-info').innerText = 
+                        `${partitions.length} partition(s) | ${totalMessages} msgs`;
+                }
+
+                // Consumer group
+                if (data.consumerGroup && !data.consumerGroup.error) {
+                    document.getElementById('kafka-group-state').innerText = data.consumerGroup.state;
+                    const lag = data.consumerGroup.totalLag || 0;
+                    const lagEl = document.getElementById('kafka-total-lag');
+                    lagEl.innerText = lag;
+                    lagEl.className = 'lag-indicator ' + (lag === 0 ? 'lag-ok' : lag < 10 ? 'lag-warning' : 'lag-danger');
+                }
+
+            } catch(e) { console.error("Kafka overview failed", e); }
+        }
+
+        async function updateRedisInspector() {
+            if (document.getElementById('redis-inspector').style.display === 'none') return;
+
+            try {
+                const res = await fetch(`${API_BASE}/redis/overview`);
+                const data = await res.json();
+
+                // Server info
+                if (data.server && data.server.status === 'CONNECTED') {
+                    document.getElementById('redis-version').innerText = data.server.version;
+                    document.getElementById('redis-uptime').innerText = `Uptime: ${data.server.uptime_days} days`;
+                    document.getElementById('redis-memory').innerText = data.server.used_memory_human;
+                    document.getElementById('redis-clients').innerText = `Clients: ${data.server.connected_clients}`;
+                } else {
+                    document.getElementById('redis-version').innerText = 'Error';
+                }
+
+                // Queue info
+                if (data.queue) {
+                    document.getElementById('redis-queue-size').innerText = data.queue.size;
+                    document.getElementById('redis-queue-name').innerText = `Queue: ${data.queue.queueName}`;
+                }
+
+            } catch(e) { console.error("Redis overview failed", e); }
+        }
+
+        async function updateMessages() {
+            // Determine active inspector to decide which endpoint to hit (or generic if unified later)
+            // For now, hit the active one
+            let url = '';
+            let tbodyId = '';
+            
+            if (document.getElementById('kafka-inspector').style.display !== 'none') {
+                url = `${API_BASE}/kafka/messages/recent`;
+                tbodyId = 'kafka-message-tbody';
+            } else {
+                url = `${API_BASE}/redis/messages/recent`;
+                tbodyId = 'redis-message-tbody';
+            }
+
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                const messages = data.messages || [];
+
+                const tbody = document.getElementById(tbodyId);
+                if (messages.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-gray)">No messages captured yet...</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = messages.slice(0, 20).map(m => `
+                    <tr>
+                        <td>${m.timestamp}</td>
+                        <td class="direction-${m.direction}">${m.direction === 'PRODUCED' ? '📤' : '📥'} ${m.direction}</td>
+                        <td>${m.target}</td>
+                        <td>${m.id || m.offset}</td>
+                        <td class="payload-preview" title="${escapeHtml(m.payload)}">${escapeHtml(m.payload)}</td>
+                    </tr>
+                `).join('');
+            } catch(e) { console.error("Messages failed", e); }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+        
+        function animateFlow() {
+            const packets = document.querySelectorAll('.packet');
+            packets.forEach(p => {
+                // Reset animation
+                p.style.animation = 'none';
+                p.offsetHeight; /* trigger reflow */
+                p.style.animation = null; 
+                p.parentElement.classList.add('run-flow');
+            });
+            setTimeout(() => {
+                document.querySelectorAll('.run-flow').forEach(el => el.classList.remove('run-flow'));
+            }, 1000);
+        }
+
+        // 6. Broker Switcher
+        async function toggleBroker() {
+            const newType = currentBrokerType === 'KAFKA' ? 'REDIS' : 'KAFKA';
+            if (!confirm(`Switch broker to ${newType}? This will change the active task processor.`)) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/tasks/config`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ brokerType: newType })
+                });
+                
+                if (res.ok) {
+                    await fetchConfig(); // Refresh UI
+                } else {
+                    const err = await res.json();
+                    alert('Failed to switch: ' + err.error);
+                }
+            } catch (e) {
+                console.error("Switch failed", e);
+                alert("Failed to switch broker");
+            }
+        }
+
+        // Poll every second
+        setInterval(() => {
+            updateStats();
+            updateTable();
+            updateKafkaInspector();
+            updateRedisInspector();
+            updateMessages();
+        }, 1000);
+        
+        // Initial load
+        fetchConfig();
+        updateStats();
+        updateTable();
+        updateKafkaInspector();
+        updateRedisInspector();
+        updateMessages();
+
+    </script>
+</body>
+</html>

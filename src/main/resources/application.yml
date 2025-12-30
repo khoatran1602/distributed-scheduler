@@ -5,6 +5,21 @@ spring:
   application:
     name: distributed-scheduler
 
+
+  # Kafka Configuration
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: scheduler-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
   # Redis Configuration
   data:
     redis:
@@ -36,6 +51,9 @@ scheduler:
     poll-interval-ms: 100
   queue:
     name: task-queue
+  broker:
+    type: redis # Options: redis, kafka
+    topic: task-events
 
 logging:
   level:

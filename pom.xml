@@ -20,7 +20,16 @@
     
     <properties>
         <java.version>21</java.version>
+        <avro.version>1.11.3</avro.version>
+        <confluent.version>7.5.0</confluent.version>
     </properties>
+
+    <repositories>
+        <repository>
+            <id>confluent</id>
+            <url>https://packages.confluent.io/maven/</url>
+        </repository>
+    </repositories>
     
     <dependencies>
         <!-- Spring Boot Web -->
@@ -74,6 +83,29 @@
             <version>2.3.0</version>
         </dependency>
         
+        <!-- Messaging: Kafka -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
+        <!-- Avro Support -->
+        <dependency>
+            <groupId>org.apache.avro</groupId>
+            <artifactId>avro</artifactId>
+            <version>${avro.version}</version>
+        </dependency>
+        
+        <!-- Kafka Avro Serializer -->
+        <!-- Note: We are using a simple serializer or finding a compatible one since Confluent libs can be heavy -->
+        <!-- For this demo, we will use standard Apache Avro + local schema management to avoid running Schema Registry if it fails -->
+        <!-- But to stick to "Gold Standard" we try to include Confluent serializer -->
+        <dependency>
+            <groupId>io.confluent</groupId>
+            <artifactId>kafka-avro-serializer</artifactId>
+            <version>${confluent.version}</version>
+        </dependency>
+
         <!-- Test Dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -106,6 +138,25 @@
                         <arg>--enable-preview</arg>
                     </compilerArgs>
                 </configuration>
+            </plugin>
+            
+            <!-- Avro Plugin -->
+            <plugin>
+                <groupId>org.apache.avro</groupId>
+                <artifactId>avro-maven-plugin</artifactId>
+                <version>${avro.version}</version>
+                <executions>
+                    <execution>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>schema</goal>
+                        </goals>
+                        <configuration>
+                            <sourceDirectory>${project.basedir}/src/main/resources/avro/</sourceDirectory>
+                            <outputDirectory>${project.basedir}/target/generated-sources/avro</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

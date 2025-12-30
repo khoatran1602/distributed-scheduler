@@ -9,13 +9,18 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Value;
 
 /**
  * REST API Controller for task submission (Producer endpoint).
  * Provides endpoints for submitting tasks and checking status.
  */
+import com.demo.scheduler.config.BrokerConfigManager;
+
 @RestController
 @RequestMapping("/api/tasks")
 public class TaskController {
@@ -23,11 +28,13 @@ public class TaskController {
     private final TaskProducer taskProducer;
     private final TaskWorker taskWorker;
     private final TaskRepository taskRepository;
-
-    public TaskController(TaskProducer taskProducer, TaskWorker taskWorker, TaskRepository taskRepository) {
+    private final BrokerConfigManager brokerConfigManager;
+    
+    public TaskController(TaskProducer taskProducer, TaskWorker taskWorker, TaskRepository taskRepository, BrokerConfigManager brokerConfigManager) {
         this.taskProducer = taskProducer;
         this.taskWorker = taskWorker;
         this.taskRepository = taskRepository;
+        this.brokerConfigManager = brokerConfigManager;
     }
 
     /**
@@ -77,11 +84,44 @@ public class TaskController {
     }
 
     /**
+     * GET /api/tasks/recent - Get recent tasks
+     */
+    @GetMapping("/recent")
+    public ResponseEntity<List<Task>> getRecentTasks() {
+        return ResponseEntity.ok(taskRepository.findTop20ByOrderByCreatedAtDesc());
+    }
+
+    /**
      * GET /api/tasks/health - Simple health check
      */
     @GetMapping("/health")
     public ResponseEntity<Map<String, String>> health() {
         return ResponseEntity.ok(Map.of("status", "UP", "service", "distributed-scheduler"));
+    }
+
+    /**
+     * GET /api/config - Get current configuration (active broker)
+     */
+    @GetMapping("/config")
+    public ResponseEntity<Map<String, String>> getConfig() {
+        return ResponseEntity.ok(Map.of("brokerType", brokerConfigManager.getBrokerType()));
+    }
+
+    /**
+     * POST /api/tasks/config - Update active broker
+     */
+    @PostMapping("/config")
+    public ResponseEntity<Map<String, String>> updateConfig(@RequestBody Map<String, String> body) {
+        String type = body.get("brokerType");
+        if (type != null) {
+            try {
+                brokerConfigManager.setBrokerType(type);
+                return ResponseEntity.ok(Map.of("brokerType", brokerConfigManager.getBrokerType(), "message", "Configuration updated"));
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            }
+        }
+        return ResponseEntity.badRequest().body(Map.of("error", "brokerType is required"));
     }
 
     // DTO classes

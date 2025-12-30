@@ -21,4 +21,6 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     @Query("SELECT t.status as status, COUNT(t) as count FROM Task t GROUP BY t.status")
     List<Object[]> getStatusCounts();
+
+    List<Task> findTop20ByOrderByCreatedAtDesc();
 }

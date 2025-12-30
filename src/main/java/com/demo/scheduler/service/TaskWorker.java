@@ -4,11 +4,15 @@ import com.demo.scheduler.model.Task;
 import com.demo.scheduler.model.Task.TaskStatus;
 import com.demo.scheduler.repository.TaskRepository;
 import jakarta.annotation.PostConstruct;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.demo.scheduler.config.BrokerConfigManager;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -16,12 +20,14 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * Task Worker service - consumes tasks from Redis and processes them.
+ * Task Worker service - consumes tasks from configured broker and processes them.
  * This is the "Consumer" in the Producer-Broker-Consumer pattern.
  * 
- * Uses a fixed thread pool for parallel task processing.
+ * Supports both Redis (poll) and Kafka (push) modes.
  */
 @Service
 public class TaskWorker {
@@ -31,6 +37,9 @@ public class TaskWorker {
     private final RedisTemplate<String, Object> redisTemplate;
     private final TaskRepository taskRepository;
     private final ExecutorService taskExecutor;
+    private final MessageCaptureService messageCapture;
+    private final ObjectMapper objectMapper;
+    private final BrokerConfigManager brokerConfigManager;
 
     @Value("${scheduler.queue.name:task-queue}")
     private String queueName;
@@ -42,32 +51,85 @@ public class TaskWorker {
     public TaskWorker(
             RedisTemplate<String, Object> redisTemplate,
             TaskRepository taskRepository,
-            @Qualifier("taskExecutor") ExecutorService taskExecutor) {
+            @Qualifier("taskExecutor") ExecutorService taskExecutor,
+            MessageCaptureService messageCapture,
+            ObjectMapper objectMapper,
+            BrokerConfigManager brokerConfigManager) {
         this.redisTemplate = redisTemplate;
         this.taskRepository = taskRepository;
         this.taskExecutor = taskExecutor;
+        this.messageCapture = messageCapture;
+        this.objectMapper = objectMapper;
+        this.brokerConfigManager = brokerConfigManager;
     }
 
     @PostConstruct
     public void init() {
-        log.info("TaskWorker initialized, polling queue: {}", queueName);
+        log.info("TaskWorker initialized. Broker Type: {}", brokerConfigManager.getBrokerType());
     }
 
     /**
-     * Polls Redis queue at fixed intervals and dispatches tasks to the thread pool.
-     * Uses leftPop (LPOP) for FIFO queue semantics.
+     * Polls Redis queue at fixed intervals.
+     * Only runs if scheduler.broker.type = redis
      */
     @Scheduled(fixedDelayString = "${scheduler.worker.poll-interval-ms:100}")
-    public void pollAndProcess() {
+    public void pollRedis() {
+        if (!"redis".equalsIgnoreCase(brokerConfigManager.getBrokerType())) {
+            return;
+        }
+
         // Try to pop a task ID from the queue
         Object taskIdObj = redisTemplate.opsForList().leftPop(queueName);
         
         if (taskIdObj != null) {
             Long taskId = convertToLong(taskIdObj);
             if (taskId != null) {
+                // Capture for inspector
+                messageCapture.captureConsumed(
+                    "REDIS",
+                    queueName,
+                    taskId.toString(),
+                    "Task ID: " + taskId
+                );
+
                 // Submit to thread pool for parallel processing
                 taskExecutor.submit(() -> processTask(taskId));
             }
+        }
+    }
+
+    /**
+     * Listens to Kafka topic.
+     * Uses JSON Deserializer to convert payload to TaskEvent
+     */
+    @KafkaListener(topics = "${scheduler.broker.topic}", groupId = "${spring.kafka.consumer.group-id}", autoStartup = "${scheduler.broker.kafka-enabled:true}")
+    public void listenKafka(ConsumerRecord<String, com.demo.scheduler.model.TaskEvent> record) {
+        if (!"kafka".equalsIgnoreCase(brokerConfigManager.getBrokerType())) {
+            return;
+        }
+        
+        log.debug("Received task from Kafka: {}", record.value());
+        
+        // Capture for inspector
+        String payload = serializeEvent(record.value());
+        String id = String.format("P-%d/O-%d", record.partition(), record.offset());
+        
+        messageCapture.captureConsumed(
+            "KAFKA",
+            record.topic(),
+            id,
+            payload
+        );
+        
+        Long taskId = record.value().getTaskId();
+        taskExecutor.submit(() -> processTask(taskId));
+    }
+
+    private String serializeEvent(com.demo.scheduler.model.TaskEvent event) {
+        try {
+            return objectMapper.writeValueAsString(event);
+        } catch (JsonProcessingException e) {
+            return event.toString();
         }
     }
 
@@ -132,11 +194,6 @@ public class TaskWorker {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Task interrupted", e);
         }
-        
-        // In a real system, you would:
-        // - Parse task.getPayload() as JSON
-        // - Execute business logic based on task type
-        // - Call external services, update databases, etc.
     }
 
     /**

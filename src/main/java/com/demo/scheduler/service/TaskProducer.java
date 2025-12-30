@@ -1,7 +1,9 @@
 package com.demo.scheduler.service;
 
+import com.demo.scheduler.config.BrokerConfigManager;
 import com.demo.scheduler.model.Task;
 import com.demo.scheduler.repository.TaskRepository;
+import com.demo.scheduler.service.broker.TaskBroker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,8 +11,10 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 /**
- * Task Producer service - pushes tasks to the Redis queue.
+ * Task Producer service - pushes tasks to the configured broker (Redis or Kafka).
  * This is the "Producer" in the Producer-Broker-Consumer pattern.
  */
 @Service
@@ -20,17 +24,24 @@ public class TaskProducer {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final TaskRepository taskRepository;
+    private final List<TaskBroker> brokers;
+    private final BrokerConfigManager brokerConfigManager;
 
     @Value("${scheduler.queue.name:task-queue}")
     private String queueName;
 
-    public TaskProducer(RedisTemplate<String, Object> redisTemplate, TaskRepository taskRepository) {
+    public TaskProducer(RedisTemplate<String, Object> redisTemplate, 
+                        TaskRepository taskRepository,
+                        List<TaskBroker> brokers,
+                        BrokerConfigManager brokerConfigManager) {
         this.redisTemplate = redisTemplate;
         this.taskRepository = taskRepository;
+        this.brokers = brokers;
+        this.brokerConfigManager = brokerConfigManager;
     }
 
     /**
-     * Submits a task: saves to PostgreSQL and pushes to Redis queue.
+     * Submits a task: saves to PostgreSQL and pushes to configured broker.
      * 
      * @param payload The task payload/data
      * @return The created Task with its assigned ID
@@ -41,19 +52,28 @@ public class TaskProducer {
         Task task = new Task(payload);
         task = taskRepository.save(task);
         
-        // 2. Push the task ID to Redis queue (right push for FIFO)
-        redisTemplate.opsForList().rightPush(queueName, task.getId());
-        
-        log.debug("Task {} submitted to queue", task.getId());
+        String currentBroker = brokerConfigManager.getBrokerType();
+
+        // 2. Route to configured broker
+        TaskBroker broker = brokers.stream()
+            .filter(b -> b.getBrokerType().equalsIgnoreCase(currentBroker))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Unknown broker type: " + currentBroker));
+
+        broker.submitTask(task);
         return task;
     }
 
     /**
      * Gets the current queue depth (number of pending tasks in Redis).
+     * Note: This is specific to Redis; for Kafka, we might return 0 or implement a Lag checker.
      */
     public long getQueueDepth() {
-        Long size = redisTemplate.opsForList().size(queueName);
-        return size != null ? size : 0;
+        if ("redis".equalsIgnoreCase(brokerConfigManager.getBrokerType())) {
+            Long size = redisTemplate.opsForList().size(queueName);
+            return size != null ? size : 0;
+        }
+        return -1; // Not supported for others yet
     }
 
     /**

@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "name": "TaskMessage",
+  "namespace": "com.demo.scheduler.avro",
+  "fields": [
+    {"name": "taskId", "type": "long"},
+    {"name": "payload", "type": "string"},
+    {"name": "createdAt", "type": "string"},
+    {"name": "priority", "type": ["null", "int"], "default": null}
+  ]
+}
