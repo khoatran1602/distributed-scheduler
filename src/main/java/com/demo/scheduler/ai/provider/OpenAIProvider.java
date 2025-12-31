@@ -23,7 +23,7 @@ import java.util.List;
 
 /**
  * OpenAI implementation of AIProvider.
- * Uses GPT-4 for high-quality structured outputs.
+ * Uses GPT-5.2 for high-quality structured outputs.
  */
 @Component
 public class OpenAIProvider implements AIProvider {
@@ -33,7 +33,7 @@ public class OpenAIProvider implements AIProvider {
     @Value("${ai.openai.api-key:}")
     private String apiKey;
     
-    @Value("${ai.openai.model:gpt-4}")
+    @Value("${ai.openai.model:gpt-5.2}")
     private String model;
     
     @Value("${ai.openai.timeout-seconds:60}")

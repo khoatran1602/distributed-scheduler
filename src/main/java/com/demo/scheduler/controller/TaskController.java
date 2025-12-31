@@ -21,7 +21,7 @@ import org.springframework.beans.factory.annotation.Value;
  */
 import com.demo.scheduler.config.BrokerConfigManager;
 
-@RestController
+//@RestController
 @RequestMapping("/api/tasks")
 public class TaskController {
 

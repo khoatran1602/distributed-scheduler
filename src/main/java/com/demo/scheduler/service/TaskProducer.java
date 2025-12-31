@@ -17,7 +17,7 @@ import java.util.List;
  * Task Producer service - pushes tasks to the configured broker (Redis or Kafka).
  * This is the "Producer" in the Producer-Broker-Consumer pattern.
  */
-@Service
+//@Service
 public class TaskProducer {
 
     private static final Logger log = LoggerFactory.getLogger(TaskProducer.class);

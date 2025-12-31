@@ -20,28 +20,28 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
-  # Redis Configuration
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      timeout: 2000ms
+  # Redis Configuration (Disabled for Demo)
+  # data:
+    # redis:
+      # host: localhost
+      # port: 6379
+      # timeout: 2000ms
 
-  # PostgreSQL Configuration
+  # PostgreSQL Configuration (Disabled for Demo -> using H2)
   datasource:
-    url: jdbc:postgresql://localhost:5432/scheduler
-    username: scheduler
-    password: scheduler123
-    driver-class-name: org.postgresql.Driver
+    url: jdbc:h2:mem:scheduler;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
 
   # JPA Configuration
   jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: create-drop
     show-sql: false
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
 # Application-specific settings
@@ -74,7 +74,7 @@ ai:
   # OpenAI Configuration
   openai:
     api-key: ${OPENAI_API_KEY:}
-    model: gpt-4
+    model: gpt-5.2
     timeout-seconds: 60
   
   # Google Gemini Configuration

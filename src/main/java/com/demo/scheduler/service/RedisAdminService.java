@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.Properties;
 
 @Slf4j
-@Service
+//@Service
 @RequiredArgsConstructor
 public class RedisAdminService {
 

@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 
-@RestController
+//@RestController
 @RequestMapping("/api/redis")
 @RequiredArgsConstructor
 @Tag(name = "Redis Inspector", description = "Endpoints to inspect Redis internals")
