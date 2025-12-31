@@ -22,6 +22,7 @@ public class WebConfig {
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", config);
+        source.registerCorsConfiguration("/api/debate/**", config);
         
         return new CorsFilter(source);
     }

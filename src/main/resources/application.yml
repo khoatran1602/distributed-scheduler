@@ -68,3 +68,35 @@ management:
   endpoint:
     health:
       show-details: always
+
+# AI Provider Configuration
+ai:
+  # OpenAI Configuration
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    model: gpt-4
+    timeout-seconds: 60
+  
+  # Google Gemini Configuration
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    model: gemini-1.5-pro
+    timeout-seconds: 60
+  
+  # Rate Limiting
+  rate-limit:
+    enabled: true
+    requests-per-minute: 10
+  
+  # Validation
+  validation:
+    max-question-length: 10000
+    max-context-length: 5000
+    min-question-length: 10
+  
+  # Orchestrator Settings
+  orchestrator:
+    timeout-seconds: 120
+    default-agent-a-provider: openai
+    default-agent-b-provider: gemini
+    default-judge-provider: openai
