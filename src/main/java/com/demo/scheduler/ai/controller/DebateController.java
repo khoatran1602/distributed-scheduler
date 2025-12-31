@@ -113,8 +113,8 @@ public class DebateController {
             log.error("Debate execution failed: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of(
-                            "error", "Internal server error",
-                            "message", "An unexpected error occurred",
+                            "error", "Debate execution failed",
+                            "message", e.getMessage() != null ? e.getMessage() : "Unknown error occurred",
                             "requestId", requestId
                     ));
         } finally {

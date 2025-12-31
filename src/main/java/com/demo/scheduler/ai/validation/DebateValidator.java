@@ -20,10 +20,10 @@ public class DebateValidator {
     @Value("${ai.validation.max-context-length:5000}")
     private int maxContextLength;
     
-    @Value("${ai.validation.min-question-length:10}")
+    @Value("${ai.validation.min-question-length:2}")
     private int minQuestionLength;
     
-    private static final Set<String> VALID_PROVIDERS = Set.of("openai", "gemini");
+    private static final Set<String> VALID_PROVIDERS = Set.of("openai", "gemini", "mock");
     
     private static final Set<String> BLOCKED_PATTERNS = Set.of(
             "<script",

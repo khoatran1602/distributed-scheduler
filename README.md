@@ -1,70 +1,60 @@
+# Distributed Scheduler & AI Debate Orchestrator
 
-# Walkthrough: Distributed Scheduler Setup
+A robust Spring Boot application that serves as both a distributed task scheduler AND a **Multi-Agent AI Orchestrator**.
 
-The Distributed Scheduler project is now running as an **Enterprise Grade** system.
+## 🧠 New Feature: Multi-Agent Debate
+The system now includes an intelligent orchestration layer that coordinates debates between different Large Language Models (LLMs).
 
-## Infrastructure Setup
-Since Docker was not available, the following local infrastructure was set up:
-- **Redis**: Installed and running (via `scoop install redis`).
-- **PostgreSQL**: Installed and running (via `scoop install postgresql`).
-- **Kafka & Zookeeper**: Installed and running from `C:\Users\Public\k`.
-- **JDK 21**: Installed.
+### capabilities
+*   **Orchestration**: Manages state and data flow between 3 agents (Proponent, Opponent, Judge).
+*   **Validation**: Secure input validation, XSS prevention, and strict length controls.
+*   **Provider Abstraction**: Seamlessly switch between OpenAI (GPT-4), Google Gemini (1.5 Pro), and Mock providers.
+*   **Rate Limiting**: In-memory protection against abuse (10 requests/min).
+*   **Error Handling**: User-friendly error messages without leaking stack traces.
 
-## Starting the Project
-We provided a script to handle the complex infrastructure startup:
+## 🚀 Setup & Run (Demo Mode)
 
-1.  **Start Infrastructure**:
-    ```powershell
-    ./setup_enterprise_infra.ps1
-    ```
-2.  **Run Application**:
-    ```powershell
-    $env:JAVA_HOME = "C:\Users\Hello\scoop\apps\temurin21-jdk\current"
-    & "$env:JAVA_HOME\bin\java.exe" -jar target\distributed-scheduler-1.0.0.jar
-    ```
+This project is currently configured for **"No-Docker Demo Mode"**. 
+It uses an in-memory H2 database and in-memory rate limiting, so you don't need Redis or PostgreSQL installed.
 
-## Usage: How to Input Data
-
-### Option 1: Visual Dashboard (Recommended)
-1.  Open [http://localhost:8080/dashboard.html](http://localhost:8080/dashboard.html).
-2.  Enter a **Payload** (e.g., "Process Order #1").
-3.  Enter **Quantity** (e.g., 50).
-4.  Click **🚀 Launch Task**.
-5.  Watch the flow diagram animate and the table populate.
-
-### Option 2: Command Line (curl)
-You can submit tasks programmatically:
+### 1. Configure API Keys
+To use real AI, you need API keys. 
+**Recommended:** Use Gemini (Free Tier).
 
 ```powershell
-Invoke-RestMethod -Uri "http://localhost:8080/api/tasks" -Method Post -Body '{"payload":"Verification Task"}' -ContentType "application/json"
+# Windows PowerShell
+$env:GEMINI_API_KEY = "your-google-api-key"
+# Optional: $env:OPENAI_API_KEY = "your-openai-key"
 ```
 
-## 4. Inspector & Dynamic Switching
-The dashboard now includes advanced features for real-time monitoring and configuration.
-
-### Redis Inspector
-When running in **Redis Mode**, the dashboard shows:
-- **Server Stats**: Uptime, Memory, Client count.
-- **Queue Stats**: Real-time queue depth.
-- **Message Flow**: Visual log of produced and consumed messages.
-
-### Dynamic Broker Switching
-You can switch between Kafka and Redis **without restarting**:
-1.  Click the **Broker Badge** (e.g., `REDIS`) in the top-left header.
-2.  Confirm the switch.
-3.  The system will instantly re-route new tasks to the selected broker.
-
-## 5. Deployment
-Build the project:
-```bash
-mvn clean package -DskipTests
+### 2. Run the Application
+```powershell
+mvn spring-boot:run
 ```
-Run the jar:
-```bash
-java -jar target/distributed-scheduler-1.0.0.jar
+The server will start on `http://localhost:8080`.
+
+## 📚 API Documentation
+
+### POST `/api/debate`
+Initiate a new debate.
+
+**Payload:**
+```json
+{
+  "question": "Is Rust better than C++?",
+  "agentAProvider": "gemini", 
+  "agentBProvider": "gemini",
+  "judgeProvider": "gemini"
+}
 ```
 
-## Verification Results
-- **Task Submission**: Verified working via Dashboard and API.
-- **Data Flow**: Producer -> Kafka -> Consumer -> PostgreSQL verified.
-- **Recent Tasks**: Verified updating correctly on the dashboard.
+**Response:**
+Returns a structured `DebateResponse` containing drafts, critiques, and the final judge verdict.
+
+## 🏗️ Architecture
+*   **Core**: Java 17, Spring Boot 3.2
+*   **Database**: H2 (In-Memory for Demo) / PostgreSQL (Production)
+*   **Queue**: Redis/Kafka (Disabled for Demo)
+*   **AI SDKs**: 
+    *   `spring-ai` (OpenAI)
+    *   Google Cloud Vertex AI / Gemini REST API

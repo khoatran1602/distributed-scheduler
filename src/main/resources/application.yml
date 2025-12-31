@@ -97,6 +97,6 @@ ai:
   # Orchestrator Settings
   orchestrator:
     timeout-seconds: 120
-    default-agent-a-provider: openai
+    default-agent-a-provider: gemini
     default-agent-b-provider: gemini
-    default-judge-provider: openai
+    default-judge-provider: gemini

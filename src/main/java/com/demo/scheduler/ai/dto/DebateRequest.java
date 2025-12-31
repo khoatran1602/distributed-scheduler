@@ -20,7 +20,7 @@ public class DebateRequest {
      * The user's question or topic for debate.
      */
     @NotBlank(message = "Question cannot be empty")
-    @Size(min = 10, max = 10000, message = "Question must be between 10 and 10000 characters")
+    @Size(min = 2, max = 10000, message = "Question must be between 2 and 10000 characters")
     private String question;
     
     /**
